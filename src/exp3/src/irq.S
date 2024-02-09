@@ -3,8 +3,8 @@
 // Making CPU aware of the vector table
 // set vbar_el1 (vector table address regsiter) to the vector table address (``vectors''')
 irq_vector_init:
-	adr	x0, vectors			
-	msr	vbar_el1, x0		
+	adr x0, vectors
+	msr vbar_el1, x0
 	ret
 
 

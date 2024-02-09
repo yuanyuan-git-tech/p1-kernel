@@ -25,6 +25,9 @@ master:
 
 #ifdef USE_QEMU 			// --> QEMU boots from EL2. cannot do things to EL3			
 	ldr	x0, =SPSR_VALUE		// spsr_el2 controls the consequence of exception return (eret), including the new exception level (EL1)
+	
+	and x0, x0, #~7         // Clear the last 3 bits of x0, `~7` is `111...1000`
+	
 	msr	spsr_el2, x0		// make sure to check out the def of SPSR_VALUE (include/arm/sysregs.h)
 
 	// Below, elr means ``exception link register''; and elr_el2 is its copy accessible at EL2. 
@@ -41,7 +44,7 @@ master:
 	//				instructions that are illegal at EL0 (e.g. MSR/MRS), CPU will trigger exceptions. 
 	//			    And since you haven't implemented any exception handlers, the kernel will enter la-la land...	
 
-	adr x0, el1_entry
+	adr x0, el0_entry
 	msr	elr_el2, x0
 #else 						// --> Rpi3 hw boots from EL3. 
 	ldr	x0, =SCR_VALUE		// Secure Configuration (EL3 only) 
@@ -66,3 +69,13 @@ el1_entry:
 	mov	sp, #LOW_MEMORY
 	bl	kernel_main		// kernel.c
 	b 	proc_hang		// should never come here
+
+
+el0_entry:
+	mov     sp, #LOW_MEMORY
+    // Attempt to execute an instruction that's not allowed at EL0
+    mrs     x1, elr_el1        // Read ELR_EL1 into x1, which is not allowed at EL0
+
+    // If the kernel is actually running in EL0, the above instruction will cause an exception.
+    // If the system continues beyond this point without trapping, it's not in EL0.
+    b       proc_hang          // Infinite loop, should not be reached if EL0

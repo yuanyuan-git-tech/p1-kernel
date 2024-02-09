@@ -17,7 +17,7 @@ gen_timer_init:
 	#		CNTP_XXX_EL0 indicates that this is for the EL1 physical timer
 	#		(Why named _EL0? I guess it means that the timer is accessible to both EL1 and EL0)
 	mov x0, #1
-	msr CNTP_CTL_EL0, x0	// writes 1 to the control register (`CNTP_CTL_EL0`) of **the EL1 physical timer**
+	msr CNTP_CTL_EL0, x0	// writes 1 to the control register (`CNTP_CTL_EL0`) of **the EL1 physical timer**	
 	ret
 
 .globl gen_timer_reset

@@ -20,7 +20,7 @@
 	// x2: the address of the instruction being executed when the exception happens. EL1 implies "when taking an exception to EL1, (this reg) holds the address to return to" 
 	mrs	x2, elr_el1
 	bl	show_invalid_entry_message
-	b	err_hang
+	// b	err_hang
 	.endm
 	
 	.macro	ventry	label
@@ -106,7 +106,7 @@ vectors:
 	ventry	sync_invalid_el0_64			// Synchronous 64-bit EL0
 	ventry	irq_invalid_el0_64			// IRQ 64-bit EL0
 	ventry	fiq_invalid_el0_64			// FIQ 64-bit EL0
-	ventry	error_invalid_el0_64			// Error 64-bit EL0
+	ventry	error_invalid_el0_64		// Error 64-bit EL0
 
 	// EL0_32 -- Exception is taken from EL0 executing in 32-bit mode
 	//		The exceptions caused in 32-bit user programs
@@ -168,16 +168,91 @@ error_invalid_el0_32:
    The format is the same as that of EL1, e.g. 16 (=4x4) exception handlers. 
    Note: EL2 vectors are for exceptions taken from EL2 and EL1
 */
- .align	11
+.align	11
 .globl vectors_el2
 vectors_el2:
 	/* --- add yours ---  */
+	ventry	sync_invalid_el2t			// Synchronous EL2t
+	ventry	irq_invalid_el2t			// IRQ EL2t
+	ventry	fiq_invalid_el2t			// FIQ EL2t
+	ventry	error_invalid_el2t			// Error EL2t
 
+	ventry	sync_invalid_el2h	        // Synchronous EL2h   (also try ventry try_to_return)
+	ventry	irq_invalid_el2h            // IRQ EL2h
+	ventry	fiq_invalid_el2h			// FIQ EL2h
+	ventry	error_invalid_el2h			// Error EL2h
+
+	ventry	el2_sync			        // Synchronous 64-bit EL1
+	ventry	irq_invalid_el1_64		    // IRQ 64-bit EL1
+	ventry	fiq_invalid_el1_64			// FIQ 64-bit EL1
+	ventry	error_invalid_el1_64		// Error 64-bit EL1
+
+	ventry	sync_invalid_el1_32			// Synchronous 32-bit EL1
+	ventry	irq_invalid_el1_32			// IRQ 32-bit EL1
+	ventry	fiq_invalid_el1_32			// FIQ 32-bit EL1
+	ventry	error_invalid_el1_32		// Error 32-bit EL1
+
+sync_invalid_el2t:
+	eret
+
+irq_invalid_el2t:
+	eret
+
+fiq_invalid_el2t:
+	eret
+
+error_invalid_el2t:
+	eret
+
+sync_invalid_el2h:
+	eret
+
+irq_invalid_el2h:
+	eret
+
+fiq_invalid_el2h:
+	eret
+
+error_invalid_el2h:
+	eret
+
+sync_invalid_el1_64:
+	eret
+	
+
+irq_invalid_el1_64:
+	eret
+
+fiq_invalid_el1_64:
+	eret
+
+error_invalid_el1_64:
+	eret
+
+sync_invalid_el1_32:
+	eret
+
+irq_invalid_el1_32:
+	eret
+
+fiq_invalid_el1_32:
+	eret
+
+error_invalid_el1_32:
+	eret
+
+/* ---- end of EL2 vectors ----- */
 
 el1_irq:
 	kernel_entry 
 	bl	handle_irq
 	kernel_exit 
+
+el2_sync:
+	kernel_entry 
+	bl	handle_irq
+	kernel_exit 
+
 
 .globl err_hang
 err_hang: b err_hang
