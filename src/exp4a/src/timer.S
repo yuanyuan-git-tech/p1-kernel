@@ -26,3 +26,13 @@ gen_timer_reset:
 	# which (roughly speaking) sets a "delta" for System Counter.
 	msr CNTP_TVAL_EL0, x0
     ret
+
+.global get_timer_frequency
+get_timer_frequency:
+    mrs x0, CNTFRQ_EL0
+    ret
+
+.global get_system_time_ticks
+get_system_time_ticks:
+	mrs x0, CNTPCT_EL0
+	ret

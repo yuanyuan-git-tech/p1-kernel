@@ -16,7 +16,12 @@
 #define CHAR_DELAY (1000000)
 #endif
 
-void process(char *array)
+struct process_args {
+    char *array;
+	int sleep_time_sec;
+};
+
+void process(struct process_args *args) 
 {
 #ifdef USE_LFB // (optional) determine the init locations on the graphical console
 	int scr_x, scr_y; 
@@ -27,7 +32,9 @@ void process(char *array)
 		scr_x = 0; scr_y = 480; 
 	}
 #endif 
-
+	char *array = args->array;
+	int sleep_time_sec = args->sleep_time_sec;
+	
 	while (1){
 		for (int i = 0; i < 5; i++){
 			uart_send(array[i]);
@@ -40,6 +47,7 @@ void process(char *array)
 #endif
 			delay(CHAR_DELAY);
 		} 
+		sleep(sleep_time_sec);
 		schedule(); // yield
 	}
 
@@ -60,7 +68,7 @@ void kernel_main(void)
 	irq_vector_init();
 	generic_timer_init();
 	enable_interrupt_controller();
-	disable_irq();		
+	enable_irq();		
 
 #ifdef USE_LFB // (optional) init output to the graphical console
 	lfb_init(); 
@@ -68,19 +76,22 @@ void kernel_main(void)
 	lfb_print(0, 240, "kernel boots");
 #endif		
 
-	int res = copy_process((unsigned long)&process, (unsigned long)"12345");
+	static struct process_args arg_1 = {"12345", 6};
+	static struct process_args arg_2 = {"abcde", 2};
+	
+	int res = copy_process((unsigned long)&process, (unsigned long)&arg_1);
 	if (res != 0) {
 		printf("error while starting process 1");
 		return;
 	}
 	
-	res = copy_process((unsigned long)&process, (unsigned long)"abcde");
+	res = copy_process((unsigned long)&process, (unsigned long)&arg_2);
 	if (res != 0) {
 		printf("error while starting process 2");
 		return;
 	}
 
-	while (1) {
+	while (1){
 		schedule();
 	}	
 }

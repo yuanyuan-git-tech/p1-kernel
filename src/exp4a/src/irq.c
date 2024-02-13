@@ -3,6 +3,7 @@
 #include "timer.h"
 #include "entry.h"
 #include "peripherals/irq.h"
+#include "sched.h"
 
 const char *entry_error_messages[] = {
     "SYNC_INVALID_EL1t",
@@ -36,9 +37,11 @@ void handle_irq(void)
 {
     // Each Core has its own pending local intrrupts register
     unsigned int irq = get32(INT_SOURCE_0);
+    unsigned int interval = (1 << 26);
     switch (irq) {
         case (GENERIC_TIMER_INTERRUPT):
-            handle_generic_timer_irq();
+            gen_timer_reset(interval);
+            check_wait_to_ready_tasks();
             break;
         default:
             printf("Unknown pending irq: %x\r\n", irq);

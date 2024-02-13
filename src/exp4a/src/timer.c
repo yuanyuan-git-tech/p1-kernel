@@ -23,6 +23,16 @@ void handle_generic_timer_irq( void )
 {
 	// TODO: In order to implement sleep(t), you should calculate @interval based on t, 
 	// instead of having a fixed @interval which triggers periodic interrupts
-	gen_timer_reset(interval);	
-	printf("Timer interrupt received. next in %u ticks\n\r", interval);
+	check_wait_to_ready_tasks();
+}
+
+void set_timer_interval( unsigned long timer_interval ) {
+	gen_timer_reset(timer_interval);
+}
+
+void clear_timer_interrupt() {
+    unsigned long cntp_ctl_value;
+    asm volatile("mrs %0, CNTP_CTL_EL0" : "=r" (cntp_ctl_value));
+    cntp_ctl_value &= ~2; // Clear the ISTATUS bit
+    asm volatile("msr CNTP_CTL_EL0, %0" :: "r"(cntp_ctl_value));
 }

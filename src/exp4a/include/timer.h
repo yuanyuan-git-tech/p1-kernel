@@ -8,9 +8,10 @@ void handle_timer_irq ( void );
 /* below are for Arm generic timers */
 void generic_timer_init ( void );
 void handle_generic_timer_irq ( void );
+void set_timer_interval( unsigned long );
+void clear_timer_interrupt( void );
 
 extern void gen_timer_init();
-/* set timer to be fired after @interval System ticks */
-extern void gen_timer_reset(int interval); 
+extern void gen_timer_reset();
 
 #endif  /*_TIMER_H */
