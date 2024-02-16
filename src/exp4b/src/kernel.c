@@ -26,6 +26,26 @@ void process2(char *array)
 	}
 }
 
+void process3(char *array)
+{
+	while (1) {
+		for (int i = 0; i < 5; i++){
+			uart_send(array[i]);
+			delay(5000000);
+		}
+	}
+}
+
+void process4(char *array)
+{
+	while (1) {
+		for (int i = 0; i < 5; i++){
+			uart_send(array[i]);
+			delay(5000000);
+		}
+	}
+}
+
 void kernel_main(void)
 {
 	uart_init();
@@ -46,6 +66,16 @@ void kernel_main(void)
 	res = copy_process((unsigned long)&process2, (unsigned long)"abcde");
 	if (res != 0) {
 		printf("error while starting process 2");
+		return;
+	}
+	res = copy_process((unsigned long)&process3, (unsigned long)"ABCDE");
+	if (res != 0) {
+		printf("error while starting process 3");
+		return;
+	}
+	res = copy_process((unsigned long)&process4, (unsigned long)"!!!!!");
+	if (res != 0) {
+		printf("error while starting process 4");
 		return;
 	}
 

@@ -23,3 +23,22 @@ cpu_switch_to:
 	mov	sp, x9
 	ret							// branch to LR (which was just loaded from memory)
 
+.globl get_task_pc
+get_task_pc:
+	ldr x0, [x0, #90]
+	ret
+
+.globl get_task_sp
+get_task_sp:
+	ldr x0, [x0, #96]
+	ret
+
+// Registers x19 to x30 are callee-saved registers.
+// x30 (the link register) holds the return address for the function call, saving it ensures the task can resume execution from the correct point.
+// The stack pointer for the next task (x1's task) is loaded into sp.
+
+// The x0 register is expected to hold the pointer to the current task's structure, while x1 will hold the pointer to the next task's structure.
+// add x8, x0, x10: This instruction calculates the address where the CPU context needs to be saved within the current task's structure. It adds the offset stored in x10 to the base address of the current task's structure (presumably stored in x0) and stores the result in x8. x8 now points to the location where the registers should be saved.
+
+// stp x19, x20, [x8], #16: This instruction stores the pair of registers x19 and x20 at the location pointed to by x8, and then automatically increments x8 by 16 bytes (the size of two registers). The stp instruction is used for "store pair", which is efficient for saving two registers at once.
+// The instruction str x30, [x8] is used to store the content of register x30 into the memory location pointed to by x8.

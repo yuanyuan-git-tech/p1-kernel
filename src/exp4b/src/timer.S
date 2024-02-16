@@ -16,3 +16,13 @@ gen_timer_init:
 gen_timer_reset:
 	msr CNTP_TVAL_EL0, x0
     ret
+
+.global get_system_timer_ticks
+get_system_timer_ticks:
+	mrs x0, CNTPCT_EL0
+	ret
+
+.global get_system_timer_frq
+get_system_timer_frq:
+	mrs x0, CNTFRQ_EL0
+	ret

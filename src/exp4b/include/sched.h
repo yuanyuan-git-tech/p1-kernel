@@ -14,6 +14,8 @@
 
 #define TASK_RUNNING				0
 
+#define TRACE_SIZE             50
+
 extern struct task_struct *current;
 extern struct task_struct * task[NR_TASKS];
 extern int nr_tasks;
@@ -42,6 +44,16 @@ struct task_struct {
 	long preempt_count;
 };
 
+struct context_switch_trace {
+	unsigned long timestamp;
+	int task_out_id;
+	unsigned long task_out_pc;
+    unsigned long task_out_sp;
+    int task_in_id;
+    unsigned long task_in_pc;
+    unsigned long task_in_sp;
+};
+
 extern void sched_init(void);
 extern void schedule(void);
 extern void timer_tick(void);
@@ -49,6 +61,10 @@ extern void preempt_disable(void);
 extern void preempt_enable(void);
 extern void switch_to(struct task_struct* next);
 extern void cpu_switch_to(struct task_struct* prev, struct task_struct* next);
+extern int getpid(void);
+extern unsigned long get_task_pc(struct task_struct* task);
+extern unsigned long get_task_sp(struct task_struct* task);
+extern void print_trace_records(void);
 
 #define INIT_TASK \
 /*cpu_context*/	{ {0,0,0,0,0,0,0,0,0,0,0,0,0}, \
