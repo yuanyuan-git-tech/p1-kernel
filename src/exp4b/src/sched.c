@@ -10,6 +10,11 @@ int nr_tasks = 1;
 struct context_switch_trace trace_buffer[TRACE_SIZE];
 int trace_index = 0;
 
+void get_current_task_pc_and_sp(unsigned long pc, unsigned long sp) {
+	current->pc_in_process = pc;
+	current->sp_in_process = sp;
+}
+
 void record_context_switch(int out_id, unsigned long out_pc, unsigned long out_sp,
                            int in_id, unsigned long in_pc, unsigned long in_sp) {
     if (trace_index < TRACE_SIZE) {
@@ -114,11 +119,10 @@ void switch_to(struct task_struct * next)
             break;
         }   
     }
-
-	unsigned long out_pc = current->cpu_context.pc;
-    unsigned long out_sp = current->cpu_context.sp;
-    unsigned long in_pc = get_task_pc(next);
-    unsigned long in_sp = get_task_sp(next);
+	unsigned long out_pc = current->pc_in_process;
+    unsigned long out_sp = current->sp_in_process;
+	unsigned long in_pc = next->pc_in_process;
+	unsigned long in_sp = next->sp_in_process;
 
 	record_context_switch(out_id, out_pc, out_sp, in_id, in_pc, in_sp);
 

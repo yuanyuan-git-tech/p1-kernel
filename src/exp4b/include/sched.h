@@ -42,6 +42,8 @@ struct task_struct {
 	long counter; /* countdown for scheduling. higher value means having run for less. recharged in schedule(). decremented in timer_tick(). always non negative */
 	long priority;
 	long preempt_count;
+	unsigned long pc_in_process;
+	unsigned long sp_in_process;
 };
 
 struct context_switch_trace {
@@ -62,13 +64,11 @@ extern void preempt_enable(void);
 extern void switch_to(struct task_struct* next);
 extern void cpu_switch_to(struct task_struct* prev, struct task_struct* next);
 extern int getpid(void);
-extern unsigned long get_task_pc(struct task_struct* task);
-extern unsigned long get_task_sp(struct task_struct* task);
 extern void print_trace_records(void);
 
 #define INIT_TASK \
 /*cpu_context*/	{ {0,0,0,0,0,0,0,0,0,0,0,0,0}, \
-/* state etc */	0,0,1, 0 \
+/* state etc */	0,0,1, 0, 0, 0\
 }
 
 #endif

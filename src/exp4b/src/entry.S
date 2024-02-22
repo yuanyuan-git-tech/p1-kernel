@@ -32,6 +32,9 @@
 	stp	x26, x27, [sp, #16 * 13]
 	stp	x28, x29, [sp, #16 * 14]
 
+	mrs x0, elr_el1 
+	add x1, sp, #S_FRAME_SIZE
+
 	mrs	x22, elr_el1
 	mrs	x23, spsr_el1
 
@@ -139,6 +142,7 @@ error_invalid_el0_32:
 
 el1_irq:
 	kernel_entry 
+	bl get_current_task_pc_and_sp
 	bl	handle_irq
 	kernel_exit 
 

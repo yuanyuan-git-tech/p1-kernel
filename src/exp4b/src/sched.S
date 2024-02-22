@@ -23,16 +23,6 @@ cpu_switch_to:
 	mov	sp, x9
 	ret							// branch to LR (which was just loaded from memory)
 
-.globl get_task_pc
-get_task_pc:
-	ldr x0, [x0, #90]
-	ret
-
-.globl get_task_sp
-get_task_sp:
-	ldr x0, [x0, #96]
-	ret
-
 // Registers x19 to x30 are callee-saved registers.
 // x30 (the link register) holds the return address for the function call, saving it ensures the task can resume execution from the correct point.
 // The stack pointer for the next task (x1's task) is loaded into sp.
