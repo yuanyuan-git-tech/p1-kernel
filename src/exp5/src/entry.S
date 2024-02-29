@@ -176,7 +176,8 @@ el0_sync:
 	lsr	x24, x25, #ESR_ELx_EC_SHIFT		// exception class
 	cmp	x24, #ESR_ELx_EC_SVC64			// is the currrent exception caused by SVC in 64-bit state? 
 	b.eq	el0_svc						// if yes, jump to below for handling syscalls 
-	handle_invalid_entry 0, SYNC_ERROR
+	// handle_invalid_entry 0, SYNC_ERROR
+	handle_invalid_entry 0, SYNC_INVALID_EL0_64
 
 sc_nr	.req	x25					// number of system calls
 scno	.req	x26					// syscall number
