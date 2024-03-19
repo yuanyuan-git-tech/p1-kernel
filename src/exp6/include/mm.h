@@ -29,7 +29,8 @@
 
 /* We use section mapping. The whole pgtable tree only needs three pgtables (each PAGE_SIZE). 
 That is, one pgtable at each of PGD/PUD/PMD. See our project document */
-#define PG_DIR_SIZE			(3 * PAGE_SIZE)  
+#define PG_DIR_SIZE			(4 * PAGE_SIZE)  
+// PGD|PUD|PMD|PMD
 
 #ifndef __ASSEMBLER__
 

@@ -32,8 +32,8 @@ void kernel_main()
 	printf("kernel boots ...\n\r");
 
 	irq_vector_init();
-	timer_init();
-//	generic_timer_init();
+	// timer_init();
+	generic_timer_init();
 	enable_interrupt_controller();
 	enable_irq();
 

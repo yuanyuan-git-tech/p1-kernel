@@ -1,0 +1,239 @@
+diff --git a/src/exp6/include/mm.h b/src/exp6/include/mm.h
+index 93f07e0..1cb0403 100644
+--- a/src/exp6/include/mm.h
++++ b/src/exp6/include/mm.h
+@@ -29,7 +29,8 @@
+ 
+ /* We use section mapping. The whole pgtable tree only needs three pgtables (each PAGE_SIZE). 
+ That is, one pgtable at each of PGD/PUD/PMD. See our project document */
+-#define PG_DIR_SIZE			(3 * PAGE_SIZE)  
++#define PG_DIR_SIZE			(4 * PAGE_SIZE)  
++// PGD|PUD|PMD|PMD
+ 
+ #ifndef __ASSEMBLER__
+ 
+diff --git a/src/exp6/include/peripherals/irq.h b/src/exp6/include/peripherals/irq.h
+index 58c8c70..eadf87f 100644
+--- a/src/exp6/include/peripherals/irq.h
++++ b/src/exp6/include/peripherals/irq.h
+@@ -22,7 +22,8 @@
+ // See BCM2836 ARM-local peripherals at
+ // https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
+ 
+-#define TIMER_INT_CTRL_0    (0x40000040)
++// #define TIMER_INT_CTRL_0    (0x40000040)
++#define TIMER_INT_CTRL_0 (0xffff000040000040)
+ #define INT_SOURCE_0        (LPBASE+0x60)
+ 
+ #define TIMER_INT_CTRL_0_VALUE  (1 << 1)
+diff --git a/src/exp6/include/sched.h b/src/exp6/include/sched.h
+index 7c8a8f5..19dbef3 100644
+--- a/src/exp6/include/sched.h
++++ b/src/exp6/include/sched.h
+@@ -78,7 +78,7 @@ extern void exit_process(void);
+ // 		no user mapping (ttbr0, mm->pgd=0)
+ #define INIT_TASK \
+ /*cpu_context*/ { { 0,0,0,0,0,0,0,0,0,0,0,0,0}, \
+-/* state etc */	 0,0,15, 0, PF_KTHREAD, \
++/* state etc */	 0,0, 1, 0, PF_KTHREAD, \
+ /* mm */ { 0, 0, {{0}}, 0, {0}} \
+ }
+ #endif
+diff --git a/src/exp6/src/boot.S b/src/exp6/src/boot.S
+index 37cdadd..54bf192 100644
+--- a/src/exp6/src/boot.S
++++ b/src/exp6/src/boot.S
+@@ -2,6 +2,7 @@
+ #include "arm/sysregs.h"
+ #include "mm.h"
+ #include "peripherals/base.h"
++#include "peripherals/irq.h"
+ 
+ .section ".text.boot"
+ 
+@@ -135,6 +136,29 @@ el1_entry:
+ 	add	\tbl, \tbl, #PAGE_SIZE					// point @tbl to the newly create next level pgtable. programming ease
+ 	.endm
+ 
++	/* Create a new PMD by adding an entry to the PUD */
++	// @tbl: a register pointing to the last pgtable in a memory region, from which pgtables 
++	//			are allocated sequentially
++	// @virt: the virtual address that we are currently mapping
++	// @shift: 39 in case of PGD and 30 in case of PUD
++	// 		   apply to the virtual address in order to extract current table index. 
++	// @tmp1/2: temporary registers to use; contents will be clobbered 
++	.macro create_second_pmd_entry, tbl, virt, shift, tmp1, tmp2
++	lsr \tmp1, \virt, #\shift
++    and \tmp1, \tmp1, #PTRS_PER_TABLE - 1    // tmp1: table index
++	
++    add \tmp2, \tbl, #2 * PAGE_SIZE          // tmp2: addr of the second PMD table
++											 // Calculate the address for the second PMD table. We assume the first PMD table is at tbl + PAGE_SIZE,
++    										 // so the second PMD table will be at tbl + 2 * PAGE_SIZE
++    orr \tmp2, \tmp2, #MM_TYPE_PAGE_TABLE    // tmp2: make a table descriptor. set bits[0:1] to 1.
++    str \tmp2, [\tbl, \tmp1, lsl #3]         // store descriptor (tmp2) in the PUD at the calculated index
++
++    
++    add \tbl, \tbl, #2 * PAGE_SIZE           // Point tbl to the newly created second PMD table
++											 // Update tbl to point to the newly created second PMD table. This is for ease of programming
++    										 // and allows subsequent operations to directly work with this new PMD table
++	.endm
++
+ 	// Populating entries in a PMD table for a given virt addr range 
+ 	// @tbl: a reg pointing to the PMD table
+ 	// @phys: the start of the physical region to be mapped
+@@ -172,14 +196,12 @@ __create_idmap:
+ 	mov	x2, xzr
+ 	ldr	x3, =(PHYS_MEMORY_SIZE)
+ 	create_block_map x0, x1, x2, x3, MMU_FLAGS, x4
+-
+ 	mov	x30, x29
+ 	ret
+ #endif
+ 
+ __create_page_tables:
+-	// mov	x29, x30						// save return address
+-	stp	x29, x30, [sp, #-16]!
++	mov		x29, x30						// save return address
+ 
+ 	// clear the mem region backing pgtables
+ 	adrp 	x0, pg_dir
+@@ -203,7 +225,16 @@ __create_page_tables:
+ 	ldr		x3, =(VA_START + PHYS_MEMORY_SIZE - SECTION_SIZE)	// x3 = the virtual base of the last section
+ 	create_block_map x0, x1, x2, x3, MMU_DEVICE_FLAGS, x4
+ 
+-	ldp	x29, x30, [sp], #16
+-	// mov	x30, x29						// restore return address
++	sub x0, x0, #PAGE_SIZE 	// previously, x0 points the first PMD after subtracting it by #PAGE_SIZE and x0 now points to the PUD table
++	ldr x1, =(TIMER_INT_CTRL_0)
++	create_second_pmd_entry x0, x1, PUD_SHIFT, x2, x3 
++
++	/* Mapping IRQ registers. Phys addr range: TIMER_INT_CTRL_0(0x40000040)-- TIMER_INT_CTRL_0 + SECTION_SIZE*/
++	ldr x1, =(TIMER_INT_CTRL_0 - VA_START)    // x1 = start mapping from address 0x40000040  
++	ldr x2, =(TIMER_INT_CTRL_0)   // x2 = first virtual address
++	ldr	x3, =(TIMER_INT_CTRL_0 + SECTION_SIZE)	// x3 = the virtual base of the last section
++	create_block_map x0, x1, x2, x3, MMU_FLAGS, x4
++	
++	mov	x30, x29						// restore return address
+ 	ret
+ 
+diff --git a/src/exp6/src/irq.c b/src/exp6/src/irq.c
+index cbf2531..ee72664 100644
+--- a/src/exp6/src/irq.c
++++ b/src/exp6/src/irq.c
+@@ -28,10 +28,10 @@ const char *entry_error_messages[] = {
+ 
+ void enable_interrupt_controller()
+ {
+-	put32(ENABLE_IRQS_1, SYSTEM_TIMER_IRQ_1);
++	//put32(ENABLE_IRQS_1, SYSTEM_TIMER_IRQ_1);
+ 
+   	// Enables Core 0 Timers interrupt control for the generic timer
+-//  put32(TIMER_INT_CTRL_0, TIMER_INT_CTRL_0_VALUE);
++	put32(TIMER_INT_CTRL_0, TIMER_INT_CTRL_0_VALUE);
+ }
+ 
+ void show_invalid_entry_message(int type, unsigned long esr, unsigned long address)
+@@ -39,7 +39,7 @@ void show_invalid_entry_message(int type, unsigned long esr, unsigned long addre
+ 	printf("%s, ESR: %x, address: %x\r\n", entry_error_messages[type], esr, address);
+ }
+ 
+-#if 0
++// #if 0
+ void handle_irq(void)
+ {
+ 	unsigned int irq = get32(INT_SOURCE_0);
+@@ -51,8 +51,9 @@ void handle_irq(void)
+ 			printf("Inknown pending irq: %x\r\n", irq);
+ 	}
+ }
+-#endif
++// #endif
+ 
++#if 0
+ void handle_irq(void)
+ {
+ 	unsigned int irq = get32(IRQ_PENDING_1);
+@@ -64,3 +65,4 @@ void handle_irq(void)
+ 			printf("Inknown pending irq: %x\r\n", irq);
+ 	}
+ }
++#endif
+\ No newline at end of file
+diff --git a/src/exp6/src/kernel.c b/src/exp6/src/kernel.c
+index e59a32c..871de57 100644
+--- a/src/exp6/src/kernel.c
++++ b/src/exp6/src/kernel.c
+@@ -32,8 +32,8 @@ void kernel_main()
+ 	printf("kernel boots ...\n\r");
+ 
+ 	irq_vector_init();
+-	timer_init();
+-//	generic_timer_init();
++	// timer_init();
++	generic_timer_init();
+ 	enable_interrupt_controller();
+ 	enable_irq();
+ 
+diff --git a/src/exp6/src/linker.ld b/src/exp6/src/linker.ld
+index 45b4606..b37d47e 100644
+--- a/src/exp6/src/linker.ld
++++ b/src/exp6/src/linker.ld
+@@ -18,6 +18,6 @@ SECTIONS
+ 	bss_end = .;
+ 	. = ALIGN(0x00001000);
+ 	pg_dir = .;
+-	.data.pgd : { . += (3 * (1 << 12)); }
++	.data.pgd : { . += (4 * (1 << 12)); }
+ }
+ 
+diff --git a/src/exp6/src/sched.c b/src/exp6/src/sched.c
+index ffdf34b..945cbb8 100644
+--- a/src/exp6/src/sched.c
++++ b/src/exp6/src/sched.c
+@@ -73,6 +73,7 @@ void schedule_tail(void) {
+ 
+ void timer_tick()
+ {	
++	// printf("\ncurrent->counter: %d\n", current->counter);
+ 	--current->counter;
+ 	if (current->counter>0 || current->preempt_count >0) {
+ 		return;
+diff --git a/src/exp6/src/timer.c b/src/exp6/src/timer.c
+index bdf4efd..9539aa4 100644
+--- a/src/exp6/src/timer.c
++++ b/src/exp6/src/timer.c
+@@ -2,6 +2,7 @@
+ #include "printf.h"
+ #include "sched.h"
+ #include "peripherals/timer.h"
++#include "timer.h"
+ 
+ const unsigned int interval = 200000;
+ unsigned int curVal = 0;
+@@ -34,15 +35,15 @@ void handle_timer_irq( void )
+ 	They are fully functional on both QEMU and Rpi3 
+ */
+ 
+-//void generic_timer_init ( void )
+-//{
+-//	gen_timer_init();
+-//	gen_timer_reset();
+-//}
+-//
+-//void handle_generic_timer_irq( void )
+-//{
+-//	gen_timer_reset();
+-//	timer_tick();
+-//}
++void generic_timer_init ( void )
++{
++	gen_timer_init();
++	gen_timer_reset();
++}
++
++void handle_generic_timer_irq( void )
++{
++	gen_timer_reset();
++	timer_tick();
++}
+ 

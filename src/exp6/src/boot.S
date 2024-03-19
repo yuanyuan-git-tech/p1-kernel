@@ -2,6 +2,7 @@
 #include "arm/sysregs.h"
 #include "mm.h"
 #include "peripherals/base.h"
+#include "peripherals/irq.h"
 
 .section ".text.boot"
 
@@ -85,7 +86,7 @@ el1_entry:
 
 	bl 	__create_page_tables
 
-	mov	x0, #VA_START			
+	mov	x0, #VA_START		
 	add	sp, x0, #LOW_MEMORY
 
 	adrp	x0, pg_dir	// @pg_dir: the virtual base address of the pgtables. cf mm.h
@@ -135,6 +136,29 @@ el1_entry:
 	add	\tbl, \tbl, #PAGE_SIZE					// point @tbl to the newly create next level pgtable. programming ease
 	.endm
 
+	/* Create a new PMD by adding an entry to the PUD */
+	// @tbl: a register pointing to the last pgtable in a memory region, from which pgtables 
+	//			are allocated sequentially
+	// @virt: the virtual address that we are currently mapping
+	// @shift: 39 in case of PGD and 30 in case of PUD
+	// 		   apply to the virtual address in order to extract current table index. 
+	// @tmp1/2: temporary registers to use; contents will be clobbered 
+	.macro create_second_pmd_entry, tbl, virt, shift, tmp1, tmp2
+	lsr \tmp1, \virt, #\shift
+    and \tmp1, \tmp1, #PTRS_PER_TABLE - 1    // tmp1: table index
+	
+    add \tmp2, \tbl, #2 * PAGE_SIZE          // tmp2: addr of the second PMD table
+											 // Calculate the address for the second PMD table. We assume the first PMD table is at tbl + PAGE_SIZE,
+    										 // so the second PMD table will be at tbl + 2 * PAGE_SIZE
+    orr \tmp2, \tmp2, #MM_TYPE_PAGE_TABLE    // tmp2: make a table descriptor. set bits[0:1] to 1.
+    str \tmp2, [\tbl, \tmp1, lsl #3]         // store descriptor (tmp2) in the PUD at the calculated index
+
+    
+    add \tbl, \tbl, #2 * PAGE_SIZE           // Point tbl to the newly created second PMD table
+											 // Update tbl to point to the newly created second PMD table. This is for ease of programming
+    										 // and allows subsequent operations to directly work with this new PMD table
+	.endm
+
 	// Populating entries in a PMD table for a given virt addr range 
 	// @tbl: a reg pointing to the PMD table
 	// @phys: the start of the physical region to be mapped
@@ -172,14 +196,12 @@ __create_idmap:
 	mov	x2, xzr
 	ldr	x3, =(PHYS_MEMORY_SIZE)
 	create_block_map x0, x1, x2, x3, MMU_FLAGS, x4
-
 	mov	x30, x29
 	ret
 #endif
 
 __create_page_tables:
-	// mov	x29, x30						// save return address
-	stp	x29, x30, [sp, #-16]!
+	mov		x29, x30						// save return address
 
 	// clear the mem region backing pgtables
 	adrp 	x0, pg_dir
@@ -188,7 +210,7 @@ __create_page_tables:
 
 	// allocate one PUD & one PMD; link PGD (pg_dir)->PUD, and PUD->PMD
 	adrp	x0, pg_dir
-	mov		x1, #VA_START 
+	mov	x1, #VA_START	
 	create_pgd_entry x0, x1, x2, x3		// after this, x0 points to the new PMD table
 
 	/* Mapping kernel and init stack. Phys addr range: 0--DEVICE_BASE */
@@ -203,7 +225,16 @@ __create_page_tables:
 	ldr		x3, =(VA_START + PHYS_MEMORY_SIZE - SECTION_SIZE)	// x3 = the virtual base of the last section
 	create_block_map x0, x1, x2, x3, MMU_DEVICE_FLAGS, x4
 
-	ldp	x29, x30, [sp], #16
-	// mov	x30, x29						// restore return address
+	sub x0, x0, #PAGE_SIZE 	// previously, x0 points the first PMD after subtracting it by #PAGE_SIZE and x0 now points to the PUD table
+	ldr x1, =(TIMER_INT_CTRL_0)
+	create_second_pmd_entry x0, x1, PUD_SHIFT, x2, x3 
+
+	/* Mapping IRQ registers. Phys addr range: TIMER_INT_CTRL_0(0x40000040)-- TIMER_INT_CTRL_0 + SECTION_SIZE*/
+	ldr x1, =(TIMER_INT_CTRL_0 - VA_START)    // x1 = start mapping from address 0x40000040  
+	ldr x2, =(TIMER_INT_CTRL_0)   // x2 = first virtual address
+	ldr	x3, =(TIMER_INT_CTRL_0 + SECTION_SIZE)	// x3 = the virtual base of the last section
+	create_block_map x0, x1, x2, x3, MMU_FLAGS, x4
+	
+	mov	x30, x29						// restore return address
 	ret
 
